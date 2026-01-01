@@ -222,6 +222,68 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     }
   }
 
+  void _showUploadProgressDialog(String fileName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Uploading $fileName...',
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please wait',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteProgressDialog(String fileName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Deleting ${fileName.split('/').last}...',
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please wait',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _downloadObject(String key, {bool showDialog = true}) async {
     if (showDialog) {
       setState(() {
@@ -318,12 +380,27 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     );
 
     if (confirmed == true) {
+      // Show progress dialog
+      _showDeleteProgressDialog(key);
+
       try {
         await _minio.removeObject(widget.serverConfig.bucket, key);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deleted $key')));
-        _listObjects();
+
+        // Close progress dialog
+        if (mounted) {
+          Navigator.pop(context); // Close progress dialog
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deleted $key')));
+          _listObjects();
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting $key: $e')));
+        // Close progress dialog if still open
+        if (mounted) {
+          try {
+            Navigator.pop(context); // Close progress dialog
+          } catch (_) {}
+
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting $key: $e')));
+        }
       }
     }
   }
@@ -528,17 +605,32 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 
         debugPrint('Uploading $fileName to $key');
 
+        // Show progress dialog
+        _showUploadProgressDialog(fileName);
+
         await _minio.fPutObject(widget.serverConfig.bucket, key, filePath);
 
+        // Close progress dialog
         if (mounted) {
+          Navigator.pop(context); // Close progress dialog
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Uploaded $fileName')),
           );
           _listObjects(prefix: _currentPrefix);
         }
+      } else {
+        // User cancelled file picker
+        setState(() {
+          _isUploading = false;
+        });
       }
     } catch (e) {
+      // Close progress dialog if still open
       if (mounted) {
+        try {
+          Navigator.pop(context); // Close progress dialog
+        } catch (_) {}
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload failed: $e'),
@@ -547,7 +639,7 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && _isUploading) {
         setState(() {
           _isUploading = false;
         });
