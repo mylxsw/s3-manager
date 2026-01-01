@@ -154,16 +154,27 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 
       // Convert ListObjectsResult to S3Item
       final items = <S3Item>[];
+      final directories = <S3Item>[];
+      final files = <S3Item>[];
+
       for (final result in results) {
-        // Add objects
-        for (final obj in result.objects) {
-          items.add(S3Item.fromObject(obj));
-        }
-        // Add directory prefixes
+        // Add directory prefixes first
         for (final prefix in result.prefixes) {
-          items.add(S3Item.fromPrefix(prefix));
+          directories.add(S3Item.fromPrefix(prefix));
+        }
+        // Add objects (files)
+        for (final obj in result.objects) {
+          files.add(S3Item.fromObject(obj));
         }
       }
+
+      // Sort directories and files separately
+      directories.sort((a, b) => a.key.compareTo(b.key));
+      files.sort((a, b) => a.key.compareTo(b.key));
+
+      // Combine: directories first, then files
+      items.addAll(directories);
+      items.addAll(files);
 
       setState(() {
         _objects = items;
@@ -208,33 +219,6 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
           duration: const Duration(seconds: 8),
         ),
       );
-    }
-  }
-
-  Future<void> _uploadObject() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-
-    if (result != null) {
-      setState(() {
-        _isUploading = true;
-      });
-
-      try {
-        final file = result.files.single;
-        final filePath = file.path!;
-        final fileName = file.name;
-
-        await _minio.fPutObject(widget.serverConfig.bucket, fileName, filePath);
-
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Uploaded $fileName')));
-        _listObjects();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error uploading file: $e')));
-      } finally {
-        setState(() {
-          _isUploading = false;
-        });
-      }
     }
   }
 
