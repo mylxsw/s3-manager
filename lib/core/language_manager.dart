@@ -133,7 +133,7 @@ class LanguageManager extends ChangeNotifier {
 
       // 设置页面
       'appearance_settings': '外观设置',
-      'dark_mode': '深色模式',
+      'dark_mode': '主题',
       'dark_mode_desc': '启用深色主题',
       'language_settings': '语言设置',
       'language': '语言',
@@ -252,7 +252,7 @@ class LanguageManager extends ChangeNotifier {
 
       // Settings page
       'appearance_settings': 'Appearance Settings',
-      'dark_mode': 'Dark Mode',
+      'dark_mode': 'Theme',
       'dark_mode_desc': 'Enable dark theme',
       'language_settings': 'Language Settings',
       'language': 'Language',
