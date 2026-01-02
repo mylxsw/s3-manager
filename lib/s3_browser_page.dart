@@ -1105,33 +1105,6 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
                 ),
               ]
             : [
-                // Selection mode toggle
-                IconButton(
-                  icon: const Icon(Icons.checklist),
-                  onPressed: () {
-                    setState(() {
-                      _isSelectionMode = true;
-                    });
-                  },
-                  tooltip: 'Select files',
-                ),
-                // Edit Server Button
-                if (widget.onEditServer != null)
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: widget.onEditServer,
-                    tooltip: context.loc('edit_server'),
-                  ),
-                // View toggle button
-                IconButton(
-                  icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
-                  onPressed: () {
-                    setState(() {
-                      _isGridView = !_isGridView;
-                    });
-                  },
-                  tooltip: _isGridView ? 'List view' : 'Grid view',
-                ),
                 // Create folder button
                 IconButton(
                   icon: const Icon(Icons.create_new_folder),
@@ -1144,6 +1117,27 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
                   onPressed: _isUploading ? null : _uploadFile,
                   tooltip: 'Upload file',
                 ),
+                // Selection mode toggle
+                IconButton(
+                  icon: const Icon(Icons.checklist),
+                  onPressed: () {
+                    setState(() {
+                      _isSelectionMode = true;
+                    });
+                  },
+                  tooltip: 'Select files',
+                ),
+                // View toggle button
+                IconButton(
+                  icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
+                  onPressed: () {
+                    setState(() {
+                      _isGridView = !_isGridView;
+                    });
+                  },
+                  tooltip: _isGridView ? 'List view' : 'Grid view',
+                ),
+
                 // Refresh button
                 IconButton(
                   icon: const Icon(Icons.refresh),
