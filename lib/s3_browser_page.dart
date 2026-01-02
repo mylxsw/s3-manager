@@ -12,6 +12,7 @@ import 'package:s3_ui/widgets/loading_overlay.dart';
 import 'package:s3_ui/core/localization.dart';
 import 'package:s3_ui/core/upload_manager.dart';
 import 'package:s3_ui/widgets/upload_queue_ui.dart';
+import 'package:s3_ui/widgets/download_queue_ui.dart';
 
 /// Represents an S3 object or directory prefix
 class S3Item {
@@ -79,8 +80,8 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
   // Cache storage for file listings
   final Map<String, List<S3Item>> _cache = {};
   bool _isRefreshing = false;
-  UploadManager?
-  _uploadManager; // Make UploadManager nullable to prevent crashes
+  UploadManager? _uploadManager;
+  DownloadManager? _downloadManager;
   String? _initError;
 
   // Multi-select state
@@ -175,6 +176,14 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
           // Refresh file list after upload completes
           _clearCache();
           _listObjects(prefix: _currentPrefix);
+        },
+      );
+
+      // Initialize DownloadManager
+      _downloadManager = DownloadManager(
+        minio: _minio,
+        onDownloadComplete: () {
+          // Optional: Notify user or just let the queue UI handle it
         },
       );
 
@@ -366,42 +375,27 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
   }
 
   Future<void> _downloadObject(String key, {bool showDialog = true}) async {
+    if (_downloadManager == null) return;
+
+    // Try to find file size
+    int? size;
     try {
-      final stream = await _minio.getObject(widget.serverConfig.bucket, key);
-      final bytes = await stream.toList();
-      final flatBytes = bytes.expand((x) => x).toList();
-
-      // Use our download manager for better error handling
-      await DownloadManager.saveFile(
-        fileName: key,
-        bytes: Uint8List.fromList(flatBytes),
+      final obj = _objects.firstWhere(
+        (element) => element.key == key,
+        orElse: () => S3Item(key: key, isDirectory: false), // Dummy fallback
       );
+      size = obj.size;
+    } catch (_) {}
 
-      if (showDialog) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.loc('file_downloaded'), // Simple success message
-            ),
-            action: SnackBarAction(
-              label: context.loc('ok'),
-              onPressed: () {
-                // Could add functionality to open the file location
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (showDialog) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error downloading $key: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      rethrow;
+    _downloadManager!.addToQueue(widget.serverConfig.bucket, key, size: size);
+
+    if (showDialog && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.loc('downloading_file', [key.split('/').last])),
+          duration: const Duration(seconds: 1),
+        ),
+      );
     }
   }
 
@@ -1107,13 +1101,13 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
             : [
                 // Create folder button
                 IconButton(
-                  icon: const Icon(Icons.create_new_folder),
+                  icon: const Icon(Icons.create_new_folder_outlined),
                   onPressed: _isUploading ? null : _createFolder,
                   tooltip: 'Create folder',
                 ),
                 // Upload button
                 IconButton(
-                  icon: const Icon(Icons.upload_file),
+                  icon: const Icon(Icons.upload_file_outlined),
                   onPressed: _isUploading ? null : _uploadFile,
                   tooltip: 'Upload file',
                 ),
@@ -1426,6 +1420,9 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
             // Upload Queue Overlay
             if (_uploadManager != null)
               UploadQueueUI(uploadManager: _uploadManager!),
+            // Download Queue Overlay
+            if (_downloadManager != null)
+              DownloadQueueUI(downloadManager: _downloadManager!),
           ],
         ),
       ),

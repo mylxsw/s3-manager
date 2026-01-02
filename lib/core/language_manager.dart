@@ -187,6 +187,11 @@ class LanguageManager extends ChangeNotifier {
       'copy_link': '复制链接',
       'delete_server_title': '删除服务器',
       'delete_server_message': '确定要删除服务器 "{name}" 吗？',
+      'download_queue': '下载队列',
+      'downloading_count': '正在下载 %s 个文件...',
+      'download_complete': '下载完成',
+      'open': '打开',
+      'downloading_file': '正在下载 %s...',
     },
     AppLanguage.english: {
       // Common
@@ -319,6 +324,11 @@ class LanguageManager extends ChangeNotifier {
       'delete_server_title': 'Delete Server',
       'delete_server_message':
           'Are you sure you want to delete server "{name}"?',
+      'download_queue': 'Download Queue',
+      'downloading_count': 'Downloading %s files...',
+      'download_complete': 'Download Complete',
+      'open': 'Open',
+      'downloading_file': 'Downloading %s...',
     },
   };
 }
