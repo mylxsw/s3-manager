@@ -10,6 +10,8 @@ import 'package:s3_ui/core/design_system.dart';
 import 'package:s3_ui/core/theme_manager.dart';
 import 'package:s3_ui/core/language_manager.dart';
 import 'package:s3_ui/core/localization.dart';
+import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'package:s3_ui/widgets/window_title_bar.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +27,15 @@ void main() {
   );
 
   runApp(const App());
+
+  doWhenWindowReady(() {
+    const initialSize = Size(1280, 800);
+    appWindow.minSize = const Size(800, 600);
+    appWindow.size = initialSize;
+    appWindow.alignment = Alignment.center;
+    appWindow.title = "S3 Manager";
+    appWindow.show();
+  });
 }
 
 /// 主应用
@@ -80,7 +91,6 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -96,370 +106,462 @@ class _AppShellState extends State<AppShell> {
         }
 
         return Scaffold(
-          body: Row(
-            children: [
-              // 左侧导航栏 - NavigationRail
-              NavigationRail(
-                extended: _isSidebarExtended,
-                minExtendedWidth: _sidebarWidth,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                elevation: 2,
-                leading: Column(
-                  children: [
-                    if (_isSidebarExtended)
-                      SizedBox(
-                        height: 80,
-                        width: _sidebarWidth,
-                        child: Stack(
-                          children: [
-                            // Logo - Vertically aligned
-                            Positioned(
-                              top: 24,
-                              left: 12,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Theme.of(context).colorScheme.primary,
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.secondary,
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.cloud_outlined,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'S3',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                            ),
-                                      ),
-                                      Text(
-                                        'MANAGER',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                              fontSize: 8,
-                                              letterSpacing: 2,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.7),
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Collapse Button - Absolute Top Right
-                            Positioned(
-                              top: 12,
-                              right: 4,
-                              child: IconButton(
-                                visualDensity: VisualDensity.compact,
-                                icon: Icon(
-                                  Icons.menu_open_rounded,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isSidebarExtended = false;
-                                  });
-                                },
-                                tooltip: 'Collapse',
-                              ),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          body: WindowBorder(
+            color: Colors.transparent,
+            width: 0,
+            child: Column(
+              children: [
+                // Custom Title Bar
+                const WindowTitleBar(),
+                Expanded(
+                  child: Row(
+                    children: [
+                      // 左侧导航栏 - Floating Sidebar
+                      Container(
+                        width: _isSidebarExtended ? _sidebarWidth : 80,
+                        margin: const EdgeInsets.fromLTRB(8, 0, 0, 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                      )
-                    else
-                      // Collapsed: Toggle acts as logo
-                      Container(
-                        height: 80,
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.only(top: 24),
-                        child: IconButton(
-                          icon: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Theme.of(context).colorScheme.primary,
-                                  Theme.of(context).colorScheme.secondary,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.cloud_outlined,
-                              size: 24,
-                              color: Colors.white,
-                            ),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isSidebarExtended = true;
-                            });
-                          },
-                          tooltip: 'Expand',
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    // Add Server Button
-                    // Add Server Button
-                    if (_isSidebarExtended)
-                      SizedBox(
-                        width: _sidebarWidth - 32,
-                        child: AppComponents.primaryButton(
-                          text: context.loc('add_new_server'),
-                          icon: Icons.add,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    S3ConfigPage(onSave: _loadConfigs),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    else
-                      Center(
-                        child: IconButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    S3ConfigPage(onSave: _loadConfigs),
-                              ),
-                            );
-                          },
-                          icon: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          tooltip: context.loc('add_new_server'),
-                        ),
-                      ),
-                  ],
-                ),
-                indicatorColor: Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withValues(alpha: 0.5),
-                indicatorShape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                destinations: [
-                  ..._serverConfigs.map((server) {
-                    final isSelected = _selectedServerConfig?.id == server.id;
-                    return NavigationRailDestination(
-                      icon: Icon(
-                        Icons.cloud_outlined,
-                        size: 24,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                      selectedIcon: Icon(
-                        Icons.cloud_done,
-                        size: 24,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      label: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: _sidebarWidth - 80, // Prevent overflow
-                        ),
-                        child: Text(
-                          server.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    );
-                  }),
-                ],
-                trailing: Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      // Settings Button
-                      Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const SettingsPage(),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: _isSidebarExtended
-                                  ? Row(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: NavigationRail(
+                            extended: _isSidebarExtended,
+                            minExtendedWidth: _sidebarWidth,
+                            backgroundColor: Colors.transparent,
+                            leading: Column(
+                              children: [
+                                if (_isSidebarExtended)
+                                  SizedBox(
+                                    height: 60,
+                                    width: _sidebarWidth,
+                                    child: Stack(
                                       children: [
-                                        Icon(
-                                          Icons.settings_outlined,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                          size: 20,
+                                        // Logo - Vertically aligned
+                                        Positioned(
+                                          top: 12,
+                                          left: 12,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
+                                                      Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary,
+                                                    ],
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.cloud_outlined,
+                                                  size: 20,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'S3',
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .titleMedium
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).colorScheme.primary,
+                                                        ),
+                                                  ),
+                                                  Text(
+                                                    'MANAGER',
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .labelSmall
+                                                        ?.copyWith(
+                                                          fontSize: 8,
+                                                          letterSpacing: 2,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .primary
+                                                                  .withValues(
+                                                                    alpha: 0.7,
+                                                                  ),
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          context.loc('settings'),
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            fontWeight: FontWeight.w500,
+                                        // Collapse Button - Absolute Top Right
+                                        Positioned(
+                                          top: 0,
+                                          right: 4,
+                                          child: IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            icon: Icon(
+                                              Icons.menu_open_rounded,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                              size: 20,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _isSidebarExtended = false;
+                                              });
+                                            },
+                                            tooltip: 'Collapse',
                                           ),
                                         ),
                                       ],
-                                    )
-                                  : Icon(
-                                      Icons.settings_outlined,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      size: 24,
                                     ),
+                                  )
+                                else
+                                  // Collapsed: Toggle acts as logo
+                                  Container(
+                                    height: 60,
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: IconButton(
+                                      icon: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.secondary,
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.cloud_outlined,
+                                          size: 24,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isSidebarExtended = true;
+                                        });
+                                      },
+                                      tooltip: 'Expand',
+                                    ),
+                                  ),
+                                const SizedBox(height: 12),
+                                // Add Server Button
+                                if (_isSidebarExtended)
+                                  SizedBox(
+                                    width: _sidebarWidth - 32,
+                                    child: AppComponents.primaryButton(
+                                      text: context.loc('add_new_server'),
+                                      icon: Icons.add,
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => S3ConfigPage(
+                                              onSave: _loadConfigs,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                else
+                                  Center(
+                                    child: IconButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => S3ConfigPage(
+                                              onSave: _loadConfigs,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.add,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      tooltip: context.loc('add_new_server'),
+                                    ),
+                                  ),
+                              ],
                             ),
+                            indicatorColor: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer
+                                .withValues(alpha: 0.5),
+                            indicatorShape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            destinations: [
+                              ..._serverConfigs.map((server) {
+                                final isSelected =
+                                    _selectedServerConfig?.id == server.id;
+                                return NavigationRailDestination(
+                                  icon: Icon(
+                                    Icons.cloud_outlined,
+                                    size: 24,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.7),
+                                  ),
+                                  selectedIcon: Icon(
+                                    Icons.cloud_done,
+                                    size: 24,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                  label: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth:
+                                          _sidebarWidth -
+                                          80, // Prevent overflow
+                                    ),
+                                    child: Text(
+                                      server.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                        color: isSelected
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                );
+                              }),
+                            ],
+                            trailing: Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  // Settings Button
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const SettingsPage(),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: _isSidebarExtended
+                                              ? Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.settings_outlined,
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
+                                                      size: 20,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      context.loc('settings'),
+                                                      style: TextStyle(
+                                                        color: Theme.of(
+                                                          context,
+                                                        ).colorScheme.primary,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              : Icon(
+                                                  Icons.settings_outlined,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  size: 24,
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            onDestinationSelected: (index) {
+                              setState(() {
+                                _selectedServerConfig = _serverConfigs[index];
+                              });
+                            },
+                            selectedIndex:
+                                _selectedServerConfig != null &&
+                                    _serverConfigs.isNotEmpty
+                                ? _serverConfigs.indexWhere(
+                                    (s) => s.id == _selectedServerConfig!.id,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+
+                      // Resize Handle
+                      MouseRegion(
+                        cursor: SystemMouseCursors.resizeColumn,
+                        onEnter: (_) =>
+                            setState(() => _isHoveringResizeHandle = true),
+                        onExit: (_) =>
+                            setState(() => _isHoveringResizeHandle = false),
+                        child: GestureDetector(
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              // Only resize if extended
+                              if (!_isSidebarExtended) {
+                                if (details.delta.dx > 5) {
+                                  _isSidebarExtended = true;
+                                }
+                                return;
+                              }
+
+                              _sidebarWidth += details.delta.dx;
+                              if (_sidebarWidth < 180) _sidebarWidth = 180;
+                              if (_sidebarWidth > 400) _sidebarWidth = 400;
+                            });
+                          },
+                          child: Container(
+                            width: 8,
+                            height: double.infinity,
+                            color: Colors.transparent,
+                            child: Center(
+                              child: Container(
+                                width: 2,
+                                color: _isHoveringResizeHandle
+                                    ? Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: 0.5)
+                                    : Colors.transparent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Right Content Area - Floating
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(0, 0, 8, 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _selectedServerConfig != null
+                                ? S3BrowserPage(
+                                    serverConfig: _selectedServerConfig!,
+                                  )
+                                : AppComponents.emptyState(
+                                    icon: Icons.cloud_off_outlined,
+                                    title: context.loc('no_server_selected'),
+                                    subtitle: context.loc(
+                                      'select_server_to_start',
+                                    ),
+                                    onAction: _serverConfigs.isEmpty
+                                        ? () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    S3ConfigPage(
+                                                      onSave: _loadConfigs,
+                                                    ),
+                                              ),
+                                            );
+                                          }
+                                        : null,
+                                    actionText: _serverConfigs.isEmpty
+                                        ? context.loc('add_new_server')
+                                        : null,
+                                  ),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                onDestinationSelected: (index) {
-                  setState(() {
-                    _selectedServerConfig = _serverConfigs[index];
-                  });
-                },
-                selectedIndex:
-                    _selectedServerConfig != null && _serverConfigs.isNotEmpty
-                    ? _serverConfigs.indexWhere(
-                        (s) => s.id == _selectedServerConfig!.id,
-                      )
-                    : null,
-              ),
-
-              // Resize Handle
-              MouseRegion(
-                cursor: SystemMouseCursors.resizeColumn,
-                onEnter: (_) => setState(() => _isHoveringResizeHandle = true),
-                onExit: (_) => setState(() => _isHoveringResizeHandle = false),
-                child: GestureDetector(
-                  onHorizontalDragUpdate: (details) {
-                    setState(() {
-                      // Only resize if extended
-                      if (!_isSidebarExtended) {
-                        if (details.delta.dx > 5) {
-                          _isSidebarExtended = true;
-                        }
-                        return;
-                      }
-
-                      _sidebarWidth += details.delta.dx;
-                      if (_sidebarWidth < 180) _sidebarWidth = 180;
-                      if (_sidebarWidth > 400) _sidebarWidth = 400;
-                    });
-                  },
-                  child: Container(
-                    width: 5,
-                    height: double.infinity,
-                    color: _isHoveringResizeHandle
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.3)
-                        : Colors.transparent,
-                  ),
-                ),
-              ),
-
-              // Right Content Area
-              Expanded(
-                child: Container(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  child: _selectedServerConfig != null
-                      ? S3BrowserPage(serverConfig: _selectedServerConfig!)
-                      : AppComponents.emptyState(
-                          icon: Icons.cloud_off_outlined,
-                          title: context.loc('no_server_selected'),
-                          subtitle: context.loc('select_server_to_start'),
-                          onAction: _serverConfigs.isEmpty
-                              ? () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          S3ConfigPage(onSave: _loadConfigs),
-                                    ),
-                                  );
-                                }
-                              : null,
-                          actionText: _serverConfigs.isEmpty
-                              ? context.loc('add_new_server')
-                              : null,
-                        ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
