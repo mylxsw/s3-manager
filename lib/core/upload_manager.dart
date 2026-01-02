@@ -33,13 +33,18 @@ class UploadManager extends ChangeNotifier {
   final Minio _minio;
   final String _bucket;
   final String? _cdnUrl;
+  final VoidCallback? onUploadComplete;
 
   bool _isProcessing = false;
 
-  UploadManager({required Minio minio, required String bucket, String? cdnUrl})
-    : _minio = minio,
-      _bucket = bucket,
-      _cdnUrl = cdnUrl;
+  UploadManager({
+    required Minio minio,
+    required String bucket,
+    String? cdnUrl,
+    this.onUploadComplete,
+  }) : _minio = minio,
+       _bucket = bucket,
+       _cdnUrl = cdnUrl;
 
   List<UploadItem> get queue => List.unmodifiable(_queue);
 
@@ -136,6 +141,8 @@ class UploadManager extends ChangeNotifier {
           item.status = UploadStatus.success;
           item.progress = 1.0;
           item.resultUrl = _buildFileUrl(item.targetKey);
+          // Trigger callback to refresh file list
+          onUploadComplete?.call();
         } catch (e) {
           item.status = UploadStatus.failed;
           item.errorMessage = e.toString();

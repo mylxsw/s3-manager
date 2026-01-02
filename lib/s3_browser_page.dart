@@ -167,6 +167,11 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
         minio: _minio,
         bucket: widget.serverConfig.bucket,
         cdnUrl: widget.serverConfig.cdnUrl,
+        onUploadComplete: () {
+          // Refresh file list after upload completes
+          _clearCache();
+          _listObjects(prefix: _currentPrefix);
+        },
       );
 
       debugPrint('✓ MinIO client initialized successfully');

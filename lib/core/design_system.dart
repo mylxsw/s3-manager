@@ -166,6 +166,13 @@ class AppTheme {
         backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+
+      // 下拉菜单主题
+      popupMenuTheme: PopupMenuThemeData(
+        color: surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
+      ),
     );
   }
 
@@ -332,6 +339,13 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+
+      // 下拉菜单主题
+      popupMenuTheme: PopupMenuThemeData(
+        color: surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
       ),
     );
   }
