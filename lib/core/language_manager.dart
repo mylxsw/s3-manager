@@ -161,6 +161,7 @@ class LanguageManager extends ChangeNotifier {
       // 新增翻译
       'title_add_server': '添加服务器',
       'title_edit_server': '编辑服务器',
+      'edit_server': '编辑服务器',
       'collapse': '收起',
       'expand': '展开',
       'app_name_s3': 'S3',
@@ -178,6 +179,12 @@ class LanguageManager extends ChangeNotifier {
       'delete_error': '删除 %s 时出错：%s',
       'uploading_file': '正在上传 %s...',
       'deleting_file': '正在删除 %s...',
+      'upload_queue': '上传队列',
+      'uploading_count': '正在上传 %s 个文件...',
+      'upload_complete': '上传完成',
+      'clear_completed': '清除已完成',
+      'retry': '重试',
+      'copy_link': '复制链接',
     },
     AppLanguage.english: {
       // Common
@@ -282,6 +289,7 @@ class LanguageManager extends ChangeNotifier {
       // New Translations
       'title_add_server': 'Add Server',
       'title_edit_server': 'Edit Server',
+      'edit_server': 'Edit Server',
       'collapse': 'Collapse',
       'expand': 'Expand',
       'app_name_s3': 'S3',
@@ -300,6 +308,12 @@ class LanguageManager extends ChangeNotifier {
       'delete_error': 'Error deleting %s: %s',
       'uploading_file': 'Uploading %s...',
       'deleting_file': 'Deleting %s...',
+      'upload_queue': 'Upload Queue',
+      'uploading_count': 'Uploading %s files...',
+      'upload_complete': 'Upload Complete',
+      'clear_completed': 'Clear Completed',
+      'retry': 'Retry',
+      'copy_link': 'Copy Link',
     },
   };
 }

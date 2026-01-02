@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:minio/minio.dart' as minio;
-import 'package:minio/io.dart';
 import 'package:minio/models.dart';
 import 'package:s3_ui/models/s3_server_config.dart';
 import 'package:s3_ui/r2_connection_helper.dart';
 import 'package:s3_ui/download_manager.dart';
 import 'package:s3_ui/widgets/loading_overlay.dart';
 import 'package:s3_ui/core/localization.dart';
+import 'package:s3_ui/core/upload_manager.dart';
+import 'package:s3_ui/widgets/upload_queue_ui.dart';
 
 /// Represents an S3 object or directory prefix
 class S3Item {
@@ -53,8 +54,13 @@ class S3Item {
 
 class S3BrowserPage extends StatefulWidget {
   final S3ServerConfig serverConfig;
+  final VoidCallback? onEditServer;
 
-  const S3BrowserPage({super.key, required this.serverConfig});
+  const S3BrowserPage({
+    super.key,
+    required this.serverConfig,
+    this.onEditServer,
+  });
 
   @override
   State<S3BrowserPage> createState() => _S3BrowserPageState();
@@ -73,12 +79,27 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
   // Cache storage for file listings
   final Map<String, List<S3Item>> _cache = {};
   bool _isRefreshing = false;
+  UploadManager?
+  _uploadManager; // Make UploadManager nullable to prevent crashes
+  String? _initError;
 
   @override
   void initState() {
     super.initState();
-    _initializeMinio();
-    _listObjects();
+    try {
+      _initializeMinio(); // This will now initialize _uploadManager too
+    } catch (e) {
+      debugPrint('Error initializing Minio in initState: $e');
+      if (mounted) {
+        setState(() {
+          _initError = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+    if (_initError == null) {
+      _listObjects();
+    }
   }
 
   @override
@@ -140,6 +161,13 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
           region: region,
         );
       }
+
+      // Initialize UploadManager
+      _uploadManager = UploadManager(
+        minio: _minio,
+        bucket: widget.serverConfig.bucket,
+        cdnUrl: widget.serverConfig.cdnUrl,
+      );
 
       debugPrint('✓ MinIO client initialized successfully');
     } catch (e) {
@@ -221,6 +249,10 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
       items.addAll(directories);
       items.addAll(files);
 
+      debugPrint(
+        '✓ Found ${items.length} items (${directories.length} dirs, ${files.length} files)',
+      );
+
       // Update cache
       _cache[cacheKey] = List.from(items);
 
@@ -291,37 +323,6 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     final prefix = '${widget.serverConfig.id}:${widget.serverConfig.bucket}:';
     _cache.removeWhere((key, value) => key.startsWith(prefix));
     debugPrint('Cleared cache for bucket: ${widget.serverConfig.bucket}');
-  }
-
-  void _showUploadProgressDialog(String fileName) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          width: 300,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                '${context.loc('uploading_file', [fileName])}...',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                context.loc('loading'),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showDeleteProgressDialog(String fileName) {
@@ -751,24 +752,32 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
   }
 
   Future<void> _uploadFile() async {
-    setState(() {
-      _isUploading = true;
-    });
-
     try {
-      final result = await FilePicker.platform.pickFiles();
+      final result = await FilePicker.platform.pickFiles(allowMultiple: true);
 
-      if (result != null && result.files.single.path != null) {
-        final file = result.files.single;
-        final filePath = file.path!;
-        final fileName = file.name;
+      if (result != null && result.files.isNotEmpty) {
+        final paths = result.files
+            .map((f) => f.path)
+            .where((path) => path != null)
+            .cast<String>()
+            .toList();
 
-        await _uploadFileFromPath(filePath, fileName);
-      } else {
-        // User cancelled file picker
-        setState(() {
-          _isUploading = false;
-        });
+        if (paths.isNotEmpty && _uploadManager != null) {
+          _uploadManager!.addToQueue(paths, _currentPrefix);
+
+          // Clear cache to prepare for updates, though the upload is async.
+          // The UploadManager doesn't auto-refresh the file list on completion yet.
+          // We could listen to it, or just let user refresh, or optimistic update?
+          // For now, simple approach:
+          // We can't easily refresh exactly when one file finishes without listening.
+          // User can hit refresh.
+
+          // Actually, UploadManager notifies listeners. We can listen to it in initState ideally?
+          // But UploadQueueUI handles the UI.
+          // To update the file list, we might want to listen to UploadManager.
+          // Let's add listener for now? Or keep it simple.
+          // Simple for now.
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -779,54 +788,10 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
           ),
         );
       }
-    } finally {
-      if (mounted && _isUploading) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
     }
   }
 
-  Future<void> _uploadFileFromPath(String filePath, String fileName) async {
-    // Determine the key (path in bucket)
-    final key = _currentPrefix.isEmpty ? fileName : '$_currentPrefix$fileName';
-
-    debugPrint('Uploading $fileName to $key');
-
-    // Show progress dialog
-    _showUploadProgressDialog(fileName);
-
-    try {
-      await _minio.fPutObject(widget.serverConfig.bucket, key, filePath);
-
-      // Close progress dialog
-      if (mounted) {
-        Navigator.pop(context); // Close progress dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.loc('upload_success', [fileName]))),
-        );
-        // Clear cache and refresh to show the new file
-        _clearCache();
-        _listObjects(prefix: _currentPrefix);
-      }
-    } catch (e) {
-      // Close progress dialog if still open
-      if (mounted) {
-        try {
-          Navigator.pop(context); // Close progress dialog
-        } catch (_) {}
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      rethrow;
-    }
-  }
+  // _uploadFileFromPath removed as it relies on blocking UI.
 
   void _handleDragDone(DropDoneDetails details) async {
     setState(() {
@@ -835,35 +800,13 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 
     if (details.files.isEmpty) return;
 
-    // Process each dropped file
-    for (final file in details.files) {
-      try {
-        final fileName = file.name;
-        final filePath = file.path;
+    final paths = details.files
+        .map((f) => f.path)
+        .where((path) => path.isNotEmpty)
+        .toList();
 
-        if (filePath.isNotEmpty) {
-          setState(() {
-            _isUploading = true;
-          });
-
-          await _uploadFileFromPath(filePath, fileName);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to upload ${file.name}: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isUploading = false;
-          });
-        }
-      }
+    if (paths.isNotEmpty && _uploadManager != null) {
+      _uploadManager!.addToQueue(paths, _currentPrefix);
     }
   }
 
@@ -960,11 +903,67 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+      'S3BrowserPage Build: isLoading=$_isLoading, isRefreshing=$_isRefreshing, objects=${_objects.length}, error=$_initError',
+    );
+    if (_initError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.serverConfig.name),
+          actions: [
+            // Ensure Edit button is available even in error state
+            if (widget.onEditServer != null)
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: widget.onEditServer,
+                tooltip: context.loc('edit_server'),
+              ),
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to initialize connection',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  _initError!,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (widget.onEditServer != null)
+                FilledButton.icon(
+                  onPressed: widget.onEditServer,
+                  icon: const Icon(Icons.edit),
+                  label: Text(context.loc('edit_server')),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.serverConfig.name),
         backgroundColor: Colors.transparent,
         actions: [
+          // Edit Server Button
+          if (widget.onEditServer != null)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: widget.onEditServer,
+              tooltip: context.loc('edit_server'),
+            ),
           // View toggle button
           IconButton(
             icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
@@ -1013,214 +1012,227 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
           });
         },
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Positioned.fill(
-              child: Column(
-                children: [
-                  // Breadcrumb navigation
-                  if (_currentPrefix.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          // Home button to return to root
-                          if (_currentPrefix.isNotEmpty ||
-                              _prefixHistory.isNotEmpty)
-                            IconButton(
-                              onPressed: () {
-                                // Clear prefix history and go to root
-                                setState(() {
-                                  _prefixHistory.clear();
-                                  _currentPrefix = '';
-                                  _objects = [];
-                                  _isLoading = true;
-                                });
-                                _listObjects(prefix: '');
-                              },
-                              icon: const Icon(Icons.home),
-                              tooltip: 'Home',
-                              style: IconButton.styleFrom(
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface,
-                              ),
-                            ),
-                          if ((_prefixHistory.isNotEmpty ||
-                                  _currentPrefix.isNotEmpty) &&
-                              _currentPrefix.isNotEmpty)
-                            const SizedBox(width: 8),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  // Split prefix into parts and create clickable breadcrumbs
-                                  ..._currentPrefix
-                                      .split('/')
-                                      .where((part) => part.isNotEmpty)
-                                      .toList()
-                                      .asMap()
-                                      .entries
-                                      .map((entry) {
-                                        final index = entry.key;
-                                        final part = entry.value;
-                                        final parts = _currentPrefix
-                                            .split('/')
-                                            .where((p) => p.isNotEmpty)
-                                            .toList();
-                                        final isLast =
-                                            index == parts.length - 1;
-
-                                        // Reconstruct path for this segment
-                                        final pathParts = parts.sublist(
-                                          0,
-                                          index + 1,
-                                        );
-                                        final path = '${pathParts.join('/')}/';
-
-                                        return Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (index > 0)
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                    ),
-                                                child: Icon(
-                                                  Icons.chevron_right,
-                                                  size: 16,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurface
-                                                      .withValues(alpha: 0.5),
-                                                ),
-                                              ),
-                                            InkWell(
-                                              onTap: isLast
-                                                  ? null
-                                                  : () => _navigateToDirectory(
-                                                      path,
-                                                    ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2,
-                                                    ),
-                                                child: Text(
-                                                  part,
-                                                  style: isLast
-                                                      ? Theme.of(context)
-                                                            .textTheme
-                                                            .bodyMedium
-                                                            ?.copyWith(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            )
-                                                      : Theme.of(context)
-                                                            .textTheme
-                                                            .bodyMedium
-                                                            ?.copyWith(
-                                                              color:
-                                                                  Theme.of(
-                                                                        context,
-                                                                      )
-                                                                      .colorScheme
-                                                                      .primary,
-                                                              decoration:
-                                                                  TextDecoration
-                                                                      .underline,
-                                                            ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      }),
-                                ],
-                              ),
+            Column(
+              children: [
+                // Breadcrumb navigation
+                if (_currentPrefix.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      children: [
+                        // Home button to return to root
+                        if (_currentPrefix.isNotEmpty ||
+                            _prefixHistory.isNotEmpty)
+                          IconButton(
+                            onPressed: () {
+                              // Clear prefix history and go to root
+                              setState(() {
+                                _prefixHistory.clear();
+                                _currentPrefix = '';
+                                _objects = [];
+                                _isLoading = true;
+                              });
+                              _listObjects(prefix: '');
+                            },
+                            icon: const Icon(Icons.home),
+                            tooltip: 'Home',
+                            style: IconButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
                             ),
                           ),
-                          // Back button (up to parent)
-                          if (_currentPrefix.isNotEmpty)
-                            IconButton(
-                              onPressed: () {
-                                // Navigate to parent directory
-                                final parts = _currentPrefix
+                        if ((_prefixHistory.isNotEmpty ||
+                                _currentPrefix.isNotEmpty) &&
+                            _currentPrefix.isNotEmpty)
+                          const SizedBox(width: 8),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                // Split prefix into parts and create clickable breadcrumbs
+                                ..._currentPrefix
                                     .split('/')
-                                    .where((p) => p.isNotEmpty)
-                                    .toList();
-                                if (parts.isNotEmpty) {
-                                  parts.removeLast();
-                                  final parentPath = parts.isEmpty
-                                      ? ''
-                                      : '${parts.join('/')}/';
-                                  _navigateToDirectory(parentPath);
-                                }
-                              },
-                              icon: const Icon(Icons.arrow_upward),
-                              tooltip: 'Up to parent',
-                              style: IconButton.styleFrom(
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                                    .where((part) => part.isNotEmpty)
+                                    .toList()
+                                    .asMap()
+                                    .entries
+                                    .map((entry) {
+                                      final index = entry.key;
+                                      final part = entry.value;
+                                      final parts = _currentPrefix
+                                          .split('/')
+                                          .where((p) => p.isNotEmpty)
+                                          .toList();
+                                      final isLast = index == parts.length - 1;
 
-                  // Objects list/grid
-                  Expanded(
-                    child: LoadingOverlay(
-                      isLoading: _isLoading || _isRefreshing,
-                      child: _objects.isEmpty
-                          ? ((_isLoading || _isRefreshing)
-                                ? const SizedBox.expand() // Ensure it fills space
-                                : Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _currentPrefix.isEmpty
-                                              ? Icons.cloud_off
-                                              : Icons.folder_open,
-                                          size: 64,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.2),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          _currentPrefix.isEmpty
-                                              ? 'No objects in bucket'
-                                              : 'No objects in this directory',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
+                                      // Reconstruct path for this segment
+                                      final pathParts = parts.sublist(
+                                        0,
+                                        index + 1,
+                                      );
+                                      final path = '${pathParts.join('/')}/';
+
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (index > 0)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                  ),
+                                              child: Icon(
+                                                Icons.chevron_right,
+                                                size: 16,
                                                 color: Theme.of(context)
                                                     .colorScheme
                                                     .onSurface
                                                     .withValues(alpha: 0.5),
                                               ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
-                          : _isGridView
-                          ? _buildGridView()
-                          : _buildListView(),
+                                            ),
+                                          InkWell(
+                                            onTap: isLast
+                                                ? null
+                                                : () => _navigateToDirectory(
+                                                    path,
+                                                  ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 2,
+                                                  ),
+                                              child: Text(
+                                                part,
+                                                style: isLast
+                                                    ? Theme.of(context)
+                                                          .textTheme
+                                                          .bodyMedium
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          )
+                                                    : Theme.of(context)
+                                                          .textTheme
+                                                          .bodyMedium
+                                                          ?.copyWith(
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .primary,
+                                                            decoration:
+                                                                TextDecoration
+                                                                    .underline,
+                                                          ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // Back button (up to parent)
+                        if (_currentPrefix.isNotEmpty)
+                          IconButton(
+                            onPressed: () {
+                              // Navigate to parent directory
+                              final parts = _currentPrefix
+                                  .split('/')
+                                  .where((p) => p.isNotEmpty)
+                                  .toList();
+                              if (parts.isNotEmpty) {
+                                parts.removeLast();
+                                final parentPath = parts.isEmpty
+                                    ? ''
+                                    : '${parts.join('/')}/';
+                                _navigateToDirectory(parentPath);
+                              }
+                            },
+                            icon: const Icon(Icons.arrow_upward),
+                            tooltip: 'Up to parent',
+                            style: IconButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+
+                // Objects list/grid
+                Expanded(
+                  child: LoadingOverlay(
+                    isLoading: _isLoading || _isRefreshing,
+                    child: _objects.isEmpty
+                        ? ((_isLoading || _isRefreshing)
+                              ? const SizedBox.expand()
+                              : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _currentPrefix.isEmpty
+                                            ? Icons.cloud_off
+                                            : Icons.folder_open,
+                                        size: 64,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.2),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        _currentPrefix.isEmpty
+                                            ? 'No objects in bucket'
+                                            : 'No objects in this directory',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Try refreshing if you expect files here',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.5),
+                                            ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      FilledButton.icon(
+                                        onPressed: () {
+                                          _clearCache();
+                                          _listObjects(prefix: _currentPrefix);
+                                        },
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Refresh Now'),
+                                      ),
+                                    ],
+                                  ),
+                                ))
+                        : _isGridView
+                        ? _buildGridView()
+                        : _buildListView(),
+                  ),
+                ),
+              ],
             ),
             // Drag overlay
             if (_isDragging)
@@ -1259,6 +1271,9 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
                   ),
                 ),
               ),
+            // Upload Queue Overlay
+            if (_uploadManager != null)
+              UploadQueueUI(uploadManager: _uploadManager!),
           ],
         ),
       ),

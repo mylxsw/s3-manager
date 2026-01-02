@@ -718,6 +718,69 @@ class _AppShellState extends State<AppShell> {
                             child: _selectedServerConfig != null
                                 ? S3BrowserPage(
                                     serverConfig: _selectedServerConfig!,
+                                    onEditServer: () {
+                                      Navigator.push(
+                                        context,
+                                        PageRouteBuilder(
+                                          pageBuilder:
+                                              (
+                                                context,
+                                                animation,
+                                                secondaryAnimation,
+                                              ) => S3ConfigPage(
+                                                existingConfig:
+                                                    _selectedServerConfig!,
+                                                onSave: _loadConfigs,
+                                              ),
+                                          transitionsBuilder:
+                                              (
+                                                context,
+                                                animation,
+                                                secondaryAnimation,
+                                                child,
+                                              ) {
+                                                const curve =
+                                                    Curves.easeOutQuart;
+
+                                                var scaleAnimation =
+                                                    Tween(
+                                                      begin: 0.0,
+                                                      end: 1.0,
+                                                    ).animate(
+                                                      CurvedAnimation(
+                                                        parent: animation,
+                                                        curve: curve,
+                                                      ),
+                                                    );
+
+                                                var fadeAnimation =
+                                                    Tween(
+                                                      begin: 0.0,
+                                                      end: 1.0,
+                                                    ).animate(
+                                                      CurvedAnimation(
+                                                        parent: animation,
+                                                        curve: curve,
+                                                      ),
+                                                    );
+
+                                                return ScaleTransition(
+                                                  scale: scaleAnimation,
+                                                  alignment: Alignment.topRight,
+                                                  child: FadeTransition(
+                                                    opacity: fadeAnimation,
+                                                    child: child,
+                                                  ),
+                                                );
+                                              },
+                                          transitionDuration: const Duration(
+                                            milliseconds: 400,
+                                          ),
+                                          reverseTransitionDuration:
+                                              const Duration(milliseconds: 300),
+                                        ),
+                                      );
+                                    },
                                   )
                                 : AppComponents.emptyState(
                                     icon: Icons.cloud_off_outlined,
