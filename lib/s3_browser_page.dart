@@ -112,11 +112,12 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.serverConfig.id != oldWidget.serverConfig.id) {
       // Clear cache and reset state when switching servers
-      _cache.clear();
+      // Remove cache clearing to allow preserving cache across server switches
+      // _cache.clear();
       _currentPrefix = '';
       _prefixHistory.clear();
-      _objects = [];
-      _isLoading = true;
+      // _objects = []; // Let _listObjects handle this based on cache
+      // _isLoading = true; // Let _listObjects handle this based on cache
       _initializeMinio();
       _listObjects();
     }
