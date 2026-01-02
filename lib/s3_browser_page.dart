@@ -1522,7 +1522,15 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
             ],
           ),
           onTap: () {
-            if (object.isDirectory) {
+            if (_isSelectionMode && !object.isDirectory) {
+              setState(() {
+                if (isSelected) {
+                  _selectedItems.remove(object.key);
+                } else {
+                  _selectedItems.add(object.key);
+                }
+              });
+            } else if (object.isDirectory) {
               _navigateToDirectory(object.key);
             } else {
               _showFilePreview(object);
@@ -1545,48 +1553,104 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
       itemCount: _objects.length,
       itemBuilder: (context, index) {
         final object = _objects[index];
+        final isSelected = _selectedItems.contains(object.key);
+
         return Card(
-          color: Theme.of(context).cardColor,
+          color: isSelected
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).cardColor,
+          elevation: isSelected ? 4 : 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: isSelected
+                ? BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  )
+                : BorderSide.none,
+          ),
           child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
-              if (object.isDirectory) {
-                _navigateToDirectory(object.key);
+              if (_isSelectionMode) {
+                if (object.isDirectory) {
+                  // Allow navigation in selection mode for folders
+                  _navigateToDirectory(object.key);
+                } else {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedItems.remove(object.key);
+                    } else {
+                      _selectedItems.add(object.key);
+                    }
+                  });
+                }
               } else {
-                _showFilePreview(object);
+                if (object.isDirectory) {
+                  _navigateToDirectory(object.key);
+                } else {
+                  _showFilePreview(object);
+                }
               }
             },
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
               children: [
-                Icon(
-                  object.isDirectory ? Icons.folder : Icons.insert_drive_file,
-                  size: 48,
-                  color: object.isDirectory
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    object.key.startsWith(_currentPrefix)
-                        ? object.key.substring(_currentPrefix.length)
-                        : object.key,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        object.isDirectory
+                            ? Icons.folder
+                            : Icons.insert_drive_file,
+                        size: 48,
+                        color: object.isDirectory
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          object.key.startsWith(_currentPrefix)
+                              ? object.key.substring(_currentPrefix.length)
+                              : object.key,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (!object.isDirectory) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatBytes(object.size ?? 0, 0),
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (!object.isDirectory) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatBytes(object.size ?? 0, 0),
-                    style: Theme.of(context).textTheme.labelSmall,
+                if (_isSelectionMode && !object.isDirectory)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Checkbox(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedItems.add(object.key);
+                          } else {
+                            _selectedItems.remove(object.key);
+                          }
+                        });
+                      },
+                      shape: const CircleBorder(),
+                    ),
                   ),
-                ],
               ],
             ),
           ),

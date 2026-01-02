@@ -8,30 +8,23 @@ import 'package:path/path.dart' as path;
 class DownloadManager {
   /// Get the appropriate download directory based on platform
   static Future<Directory?> getDownloadDirectory() async {
-    // For sandboxed macOS apps, we can't access the real Downloads folder
-    // Instead, use the app's Documents directory
-    if (Platform.isMacOS) {
-      try {
-        // Try to get the application documents directory
-        final appDocDir = await getApplicationDocumentsDirectory();
-        // Create a Downloads subdirectory within the app's sandbox
-        final downloadsDir = Directory(path.join(appDocDir.path, 'Downloads'));
-        if (!downloadsDir.existsSync()) {
+    // Use path_provider to get the system downloads directory
+    Directory? downloadsDir;
+    try {
+      downloadsDir = await getDownloadsDirectory();
+    } catch (e) {
+      debugPrint('Error getting downloads directory: $e');
+    }
+
+    if (downloadsDir != null) {
+      if (!await downloadsDir.exists()) {
+        try {
           await downloadsDir.create(recursive: true);
-        }
-        return downloadsDir;
-      } catch (e) {
-        debugPrint('Error creating downloads directory: $e');
-      }
-    } else if (Platform.isLinux) {
-      // For Linux, try the user's Downloads folder
-      final homeDir = Platform.environment['HOME'];
-      if (homeDir != null) {
-        final downloadsDir = Directory(path.join(homeDir, 'Downloads'));
-        if (downloadsDir.existsSync()) {
-          return downloadsDir;
+        } catch (e) {
+          debugPrint('Error creating downloads directory: $e');
         }
       }
+      return downloadsDir;
     }
 
     // Final fallback to application documents directory
@@ -65,6 +58,8 @@ class DownloadManager {
       // Clean file name
       final cleanFileName = fileName.replaceAll(RegExp(r'[^\w\s.-]'), '_');
       final file = File(path.join(directory.path, cleanFileName));
+
+      debugPrint('Saving file to: ${file.path}');
 
       // Write bytes to file
       await file.writeAsBytes(bytes);
@@ -111,33 +106,35 @@ class DownloadManager {
       ),
     );
 
-    downloadFuture.then((filePath) {
-      Navigator.pop(context); // Close progress dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Downloaded: ${path.basename(filePath)}'),
-          action: SnackBarAction(
-            label: 'Open',
-            onPressed: () {
-              // Open file location
-              if (Platform.isMacOS || Platform.isLinux) {
-                Process.run('open', [path.dirname(filePath)]);
-              } else if (Platform.isWindows) {
-                Process.run('explorer', [path.dirname(filePath)]);
-              }
-            },
-          ),
-        ),
-      );
-      onDownloaded?.call();
-    }).catchError((error) {
-      Navigator.pop(context); // Close progress dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Download failed: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    });
+    downloadFuture
+        .then((filePath) {
+          Navigator.pop(context); // Close progress dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Downloaded: ${path.basename(filePath)}'),
+              action: SnackBarAction(
+                label: 'Open',
+                onPressed: () {
+                  // Open file location
+                  if (Platform.isMacOS || Platform.isLinux) {
+                    Process.run('open', [path.dirname(filePath)]);
+                  } else if (Platform.isWindows) {
+                    Process.run('explorer', [path.dirname(filePath)]);
+                  }
+                },
+              ),
+            ),
+          );
+          onDownloaded?.call();
+        })
+        .catchError((error) {
+          Navigator.pop(context); // Close progress dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Download failed: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        });
   }
 }
