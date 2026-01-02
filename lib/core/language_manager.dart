@@ -185,6 +185,8 @@ class LanguageManager extends ChangeNotifier {
       'clear_completed': '清除已完成',
       'retry': '重试',
       'copy_link': '复制链接',
+      'delete_server_title': '删除服务器',
+      'delete_server_message': '确定要删除服务器 "{name}" 吗？',
     },
     AppLanguage.english: {
       // Common
@@ -314,6 +316,9 @@ class LanguageManager extends ChangeNotifier {
       'clear_completed': 'Clear Completed',
       'retry': 'Retry',
       'copy_link': 'Copy Link',
+      'delete_server_title': 'Delete Server',
+      'delete_server_message':
+          'Are you sure you want to delete server "{name}"?',
     },
   };
 }

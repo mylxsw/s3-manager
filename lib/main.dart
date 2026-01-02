@@ -90,6 +90,131 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  Future<void> _deleteServer(S3ServerConfig server) async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> serverConfigsStrings =
+        prefs.getStringList('server_configs') ?? [];
+    serverConfigsStrings.removeWhere((configStr) {
+      final config = S3ServerConfig.fromJson(json.decode(configStr));
+      return config.id == server.id;
+    });
+    await prefs.setStringList('server_configs', serverConfigsStrings);
+    // Clear selection if deleted server was selected
+    if (_selectedServerConfig?.id == server.id) {
+      setState(() {
+        _selectedServerConfig = null;
+      });
+    }
+    await _loadConfigs();
+  }
+
+  void _showServerContextMenu(
+    BuildContext context,
+    Offset position,
+    S3ServerConfig server,
+  ) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'edit',
+          child: Row(
+            children: [
+              const Icon(Icons.edit, size: 18),
+              const SizedBox(width: 8),
+              Text(context.loc('edit_server')),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete,
+                size: 18,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                context.loc('delete'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'edit') {
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                S3ConfigPage(existingConfig: server, onSave: _loadConfigs),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  const curve = Curves.easeOutQuart;
+                  var scaleAnimation = Tween(
+                    begin: 0.0,
+                    end: 1.0,
+                  ).animate(CurvedAnimation(parent: animation, curve: curve));
+                  var fadeAnimation = Tween(
+                    begin: 0.0,
+                    end: 1.0,
+                  ).animate(CurvedAnimation(parent: animation, curve: curve));
+                  return ScaleTransition(
+                    scale: scaleAnimation,
+                    alignment: Alignment.topLeft,
+                    child: FadeTransition(opacity: fadeAnimation, child: child),
+                  );
+                },
+            transitionDuration: const Duration(milliseconds: 400),
+            reverseTransitionDuration: const Duration(milliseconds: 300),
+          ),
+        );
+      } else if (value == 'delete') {
+        _showDeleteConfirmation(context, server);
+      }
+    });
+  }
+
+  void _showDeleteConfirmation(BuildContext context, S3ServerConfig server) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.loc('delete_server_title')),
+        content: Text(
+          context
+              .loc('delete_server_message')
+              .replaceAll('{name}', server.name),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.loc('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: Text(context.loc('delete')),
+          ),
+        ],
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) {
+        _deleteServer(server);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -493,28 +618,44 @@ class _AppShellState extends State<AppShell> {
                                       context,
                                     ).colorScheme.primary,
                                   ),
-                                  label: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth:
-                                          _sidebarWidth -
-                                          80, // Prevent overflow
-                                    ),
-                                    child: Text(
-                                      server.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                        color: isSelected
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
+                                  label: GestureDetector(
+                                    onSecondaryTapDown: (details) {
+                                      _showServerContextMenu(
+                                        context,
+                                        details.globalPosition,
+                                        server,
+                                      );
+                                    },
+                                    onLongPressStart: (details) {
+                                      _showServerContextMenu(
+                                        context,
+                                        details.globalPosition,
+                                        server,
+                                      );
+                                    },
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            _sidebarWidth -
+                                            80, // Prevent overflow
+                                      ),
+                                      child: Text(
+                                        server.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          color: isSelected
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurface,
+                                        ),
                                       ),
                                     ),
                                   ),
