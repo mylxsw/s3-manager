@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // For debugPrint
-import 'package:minio/minio.dart';
+import 'package:s3_ui/core/storage/storage_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
@@ -10,7 +10,7 @@ enum DownloadStatus { pending, downloading, success, failed }
 class DownloadItem {
   final String id;
   final String key; // S3 object key
-  final String bucket;
+  final String? bucket; // Optional, for reference
   final int? size;
 
   DownloadStatus status;
@@ -20,7 +20,7 @@ class DownloadItem {
 
   DownloadItem({
     required this.key,
-    required this.bucket,
+    this.bucket,
     this.size,
     this.status = DownloadStatus.pending,
     this.progress = 0.0,
@@ -31,13 +31,13 @@ class DownloadItem {
 
 class DownloadManager extends ChangeNotifier {
   final List<DownloadItem> _queue = [];
-  final Minio _minio;
+  final StorageService _service;
   final VoidCallback? onDownloadComplete;
 
   bool _isProcessing = false;
 
-  DownloadManager({required Minio minio, this.onDownloadComplete})
-    : _minio = minio;
+  DownloadManager({required StorageService service, this.onDownloadComplete})
+    : _service = service;
 
   List<DownloadItem> get queue => List.unmodifiable(_queue);
 
@@ -72,8 +72,8 @@ class DownloadManager extends ChangeNotifier {
     return getApplicationDocumentsDirectory();
   }
 
-  void addToQueue(String bucket, String key, {int? size}) {
-    _queue.add(DownloadItem(key: key, bucket: bucket, size: size));
+  void addToQueue(String key, {int? size}) {
+    _queue.add(DownloadItem(key: key, bucket: _service.bucketName, size: size));
     notifyListeners();
     _processQueue();
   }
@@ -150,7 +150,7 @@ class DownloadManager extends ChangeNotifier {
           item.savePath = saveFile.path;
 
           // Get object stream
-          final stream = await _minio.getObject(item.bucket, item.key);
+          final stream = await _service.downloadStream(item.key);
 
           // We download the whole stream.
           // To track progress, we need to know the size (optional) and count bytes.

@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:minio/minio.dart';
+import 'package:s3_ui/core/storage/storage_service.dart';
 
 enum UploadStatus { pending, uploading, success, failed }
 
@@ -30,20 +30,17 @@ class UploadItem {
 
 class UploadManager extends ChangeNotifier {
   final List<UploadItem> _queue = [];
-  final Minio _minio;
-  final String _bucket;
+  final StorageService _service;
   final String? _cdnUrl;
   final VoidCallback? onUploadComplete;
 
   bool _isProcessing = false;
 
   UploadManager({
-    required Minio minio,
-    required String bucket,
+    required StorageService service,
     String? cdnUrl,
     this.onUploadComplete,
-  }) : _minio = minio,
-       _bucket = bucket,
+  }) : _service = service,
        _cdnUrl = cdnUrl;
 
   List<UploadItem> get queue => List.unmodifiable(_queue);
@@ -63,7 +60,7 @@ class UploadManager extends ChangeNotifier {
         UploadItem(
           filePath: path,
           fileName: fileName,
-          targetBucket: _bucket,
+          targetBucket: _service.bucketName,
           targetKey: key,
           cdnUrl: _cdnUrl,
         ),
@@ -131,12 +128,7 @@ class UploadManager extends ChangeNotifier {
           // For now, let's assume atomic upload for simplicity or mock progress.
           // If we want real progress, we need to wrap the stream.
 
-          await _minio.putObject(
-            item.targetBucket,
-            item.targetKey,
-            stream,
-            size: size,
-          );
+          await _service.uploadStream(item.targetKey, stream, size: size);
 
           item.status = UploadStatus.success;
           item.progress = 1.0;
