@@ -208,10 +208,9 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
       return;
     }
 
-    // Check if we have cached data and we're not already refreshing
-    if (_cache.containsKey(cacheKey) &&
-        !_isRefreshing &&
-        _currentPrefix == effectivePrefix) {
+    // 1. Check cache
+    if (_cache.containsKey(cacheKey)) {
+      // If we have cache, show it immediately and do NOT show loading overlay
       if (mounted) {
         setState(() {
           _objects = _cache[cacheKey]!;
@@ -219,10 +218,11 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
         });
       }
       debugPrint('Loaded from cache for prefix: $effectivePrefix');
-    } else if (!_isRefreshing) {
-      // No cache or different prefix, show loading
+    } else {
+      // If no cache, clear objects and show loading overlay
       if (mounted) {
         setState(() {
+          _objects = [];
           _isLoading = true;
         });
       }
@@ -633,9 +633,8 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     setState(() {
       _prefixHistory.add(_currentPrefix);
       _currentPrefix = prefix;
-      // Clear current objects to prevent showing stale data
-      _objects = [];
-      _isLoading = true;
+      // Do not clear objects or set loading here.
+      // _listObjects will handle it based on cache.
     });
     _listObjects(prefix: prefix);
   }
@@ -1321,9 +1320,9 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
                 // Objects list/grid
                 Expanded(
                   child: LoadingOverlay(
-                    isLoading: _isLoading || _isRefreshing,
+                    isLoading: _isLoading,
                     child: _objects.isEmpty
-                        ? ((_isLoading || _isRefreshing)
+                        ? (_isLoading
                               ? const SizedBox.expand()
                               : Center(
                                   child: Column(
