@@ -600,7 +600,25 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
     // Check if it's an image
     final isImage = RegExp(r'\.(jpg|jpeg|png|gif|bmp|webp|svg)$', caseSensitive: false).hasMatch(object.key);
 
-    // For files, show preview dialog
+    final isMobilePlatform = const [TargetPlatform.iOS, TargetPlatform.android].contains(defaultTargetPlatform);
+
+    if (isMobilePlatform) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => _PreviewPage(
+            object: object,
+            serverConfig: widget.serverConfig,
+            storageService: _storageService,
+            isImage: isImage,
+            onDownload: _downloadObject,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // For files, show preview dialog on desktop
     showDialog(
       context: context,
       builder: (context) => _PreviewDialog(
@@ -680,7 +698,7 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.loc('cancel'))),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               if (folderNameController.text.trim().isNotEmpty) {
                 Navigator.pop(context, true);
@@ -1175,7 +1193,7 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
       ),
       // Upload button
       IconButton(
-        icon: const Icon(Icons.upload_file_outlined),
+        icon: const Icon(Icons.cloud_upload_outlined),
         onPressed: _isUploading ? null : _uploadFile,
         tooltip: 'Upload file',
       ),
@@ -1202,7 +1220,7 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 
       // Refresh button
       IconButton(
-        icon: const Icon(Icons.refresh),
+        icon: const Icon(Icons.loop),
         onPressed: _isLoading || _isRefreshing
             ? null
             : () {
@@ -1457,7 +1475,54 @@ class _S3BrowserPageState extends State<S3BrowserPage> {
 }
 
 /// Custom preview dialog widget
-class _PreviewDialog extends StatefulWidget {
+class _PreviewPage extends StatelessWidget {
+  final S3Item object;
+  final S3ServerConfig serverConfig;
+  final StorageService storageService;
+  final bool isImage;
+  final Function(String, {bool showDialog}) onDownload;
+
+  const _PreviewPage({
+    required this.object,
+    required this.serverConfig,
+    required this.storageService,
+    required this.isImage,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: _PreviewContent(
+                      object: object,
+                      serverConfig: serverConfig,
+                      storageService: storageService,
+                      isImage: isImage,
+                      onDownload: onDownload,
+                      onClose: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewDialog extends StatelessWidget {
   final S3Item object;
   final S3ServerConfig serverConfig;
   final StorageService storageService;
@@ -1473,10 +1538,50 @@ class _PreviewDialog extends StatefulWidget {
   });
 
   @override
-  State<_PreviewDialog> createState() => _PreviewDialogState();
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.8,
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _PreviewContent(
+            object: object,
+            serverConfig: serverConfig,
+            storageService: storageService,
+            isImage: isImage,
+            onDownload: onDownload,
+            onClose: () => Navigator.pop(context),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _PreviewDialogState extends State<_PreviewDialog> {
+class _PreviewContent extends StatefulWidget {
+  final S3Item object;
+  final S3ServerConfig serverConfig;
+  final StorageService storageService;
+  final bool isImage;
+  final Function(String, {bool showDialog}) onDownload;
+  final VoidCallback? onClose;
+
+  const _PreviewContent({
+    required this.object,
+    required this.serverConfig,
+    required this.storageService,
+    required this.isImage,
+    required this.onDownload,
+    this.onClose,
+  });
+
+  @override
+  State<_PreviewContent> createState() => _PreviewContentState();
+}
+
+class _PreviewContentState extends State<_PreviewContent> {
   Uint8List? _imageBytes;
   bool _isLoadingImage = false;
   bool _isDownloading = false;
@@ -1612,60 +1717,67 @@ class _PreviewDialogState extends State<_PreviewDialog> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
-    return Dialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 720;
+
+        final previewDetails = isNarrow
+            ? SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AspectRatio(aspectRatio: 16 / 9, child: _buildPreviewContent()),
+                    const SizedBox(height: 16),
+                    _buildFileDetails(dateFormat),
+                  ],
+                ),
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 1, child: _buildPreviewContent()),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 1, child: _buildFileDetails(dateFormat)),
+                ],
+              );
+
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header with close button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                const SizedBox(width: 30),
                 Expanded(
                   child: Text(
-                    widget.object.key,
+                    context.loc('preview'),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
                 IconButton(
                   icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: widget.onClose,
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
             // Preview area
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Preview/Image area
-                  Expanded(flex: 1, child: _buildPreviewContent()),
-                  const SizedBox(width: 16),
-                  // File details
-                  Expanded(flex: 1, child: _buildFileDetails(dateFormat)),
-                ],
-              ),
-            ),
+            Expanded(child: previewDetails),
 
             // Action buttons
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   key: _copyButtonKey,
                   onPressed: _showCopyMenu,
                   icon: const Icon(Icons.content_copy),
-                  label: const Text('Copy'),
+                  label: Text(context.loc('copy')),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
@@ -1673,13 +1785,13 @@ class _PreviewDialogState extends State<_PreviewDialog> {
                   icon: _isDownloading
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.download),
-                  label: Text(_isDownloading ? 'Downloading...' : 'Download'),
+                  label: Text(_isDownloading ? context.loc('downloading') : context.loc('download')),
                 ),
               ],
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 

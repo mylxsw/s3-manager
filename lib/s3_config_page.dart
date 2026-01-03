@@ -132,6 +132,14 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   centerTitle: true,
+                  actions: [
+                    TextButton.icon(
+                      onPressed: _saveConfig,
+                      label: Text(context.loc('save')),
+                      icon: Icon(Icons.save, color: Theme.of(context).colorScheme.primary),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                 ),
                 backgroundColor: Colors.transparent,
                 body: Padding(
@@ -141,67 +149,37 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
                       constraints: const BoxConstraints(maxWidth: 600),
                       child: Form(
                         key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        child: ListView(
                           children: <Widget>[
-                            Expanded(
-                              child: ListView(
-                                children: <Widget>[
-                                  _buildTextFormField(context.loc('name'), _nameController, context.loc('name_hint')),
-                                  _buildTextFormField(
-                                    context.loc('address'),
-                                    _addressController,
-                                    context.loc('address_hint'),
-                                  ),
-                                  _buildTextFormField(
-                                    context.loc('bucket'),
-                                    _bucketController,
-                                    context.loc('bucket_hint'),
-                                  ),
-                                  _buildTextFormField(
-                                    context.loc('access_key_id'),
-                                    _accessKeyIdController,
-                                    context.loc('access_key_hint'),
-                                  ),
-                                  _buildTextFormField(
-                                    context.loc('secret_access_key'),
-                                    _secretAccessKeyController,
-                                    context.loc('secret_key_hint'),
-                                    obscureText: true,
-                                  ),
-                                  _buildTextFormField(
-                                    context.loc('region'),
-                                    _regionController,
-                                    context.loc('region_hint'),
-                                    isOptional: true,
-                                  ),
-                                  _buildTextFormField(
-                                    context.loc('cdn_url'),
-                                    _cdnUrlController,
-                                    context.loc('cdn_hint'),
-                                    isOptional: true,
-                                  ),
-                                ],
-                              ),
+                            _buildTextFormField(context.loc('name'), _nameController, context.loc('name_hint')),
+                            _buildTextFormField(
+                              context.loc('address'),
+                              _addressController,
+                              context.loc('address_hint'),
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text(context.loc('cancel')),
-                                ),
-                                const SizedBox(width: 12),
-                                ElevatedButton(
-                                  onPressed: _saveConfig,
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  ),
-                                  child: Text(context.loc('save')),
-                                ),
-                              ],
+                            _buildTextFormField(context.loc('bucket'), _bucketController, context.loc('bucket_hint')),
+                            _buildTextFormField(
+                              context.loc('access_key_id'),
+                              _accessKeyIdController,
+                              context.loc('access_key_hint'),
+                            ),
+                            _buildTextFormField(
+                              context.loc('secret_access_key'),
+                              _secretAccessKeyController,
+                              context.loc('secret_key_hint'),
+                              obscureText: true,
+                            ),
+                            _buildTextFormField(
+                              context.loc('region'),
+                              _regionController,
+                              context.loc('region_hint'),
+                              isOptional: true,
+                            ),
+                            _buildTextFormField(
+                              context.loc('cdn_url'),
+                              _cdnUrlController,
+                              context.loc('cdn_hint'),
+                              isOptional: true,
                             ),
                           ],
                         ),

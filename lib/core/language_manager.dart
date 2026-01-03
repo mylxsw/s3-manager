@@ -18,8 +18,7 @@ enum AppLanguage {
 /// 语言管理器
 class LanguageManager extends ChangeNotifier {
   static LanguageManager? _instance;
-  static LanguageManager get instance =>
-      _instance ??= LanguageManager._internal();
+  static LanguageManager get instance => _instance ??= LanguageManager._internal();
 
   LanguageManager._internal() {
     _loadLanguage();
@@ -115,6 +114,8 @@ class LanguageManager extends ChangeNotifier {
       'upload': '上传',
       'download': '下载',
       'copy_url': '复制 URL',
+      'copy': '复制',
+      'preview': '预览',
       'rename': '重命名',
       'delete_file': '删除文件',
       'delete_folder': '删除文件夹',
@@ -143,11 +144,9 @@ class LanguageManager extends ChangeNotifier {
 
       // 错误信息
       'connection_error': '连接错误',
-      'connection_failed_check':
-          '连接失败。请检查：\n1. 网络连接\n2. 端点 URL 是否正确\n3. 访问凭据是否有效\n4. 对于 R2：确保存储桶存在且可访问',
+      'connection_failed_check': '连接失败。请检查：\n1. 网络连接\n2. 端点 URL 是否正确\n3. 访问凭据是否有效\n4. 对于 R2：确保存储桶存在且可访问',
       'access_denied': '访问被拒绝',
-      'access_denied_check':
-          '访问被拒绝。请检查：\n1. 访问密钥和密钥是否正确\n2. 存储桶是否存在\n3. 您是否具有存储桶的列表权限',
+      'access_denied_check': '访问被拒绝。请检查：\n1. 访问密钥和密钥是否正确\n2. 存储桶是否存在\n3. 您是否具有存储桶的列表权限',
       'bucket_not_found': '存储桶未找到',
       'bucket_not_found_check': '存储桶未找到。请检查：\n1. 存储桶名称拼写是否正确\n2. 存储桶是否存在于您的账户中',
 
@@ -261,8 +260,7 @@ class LanguageManager extends ChangeNotifier {
       's3_manager': 'Ploy S3',
       'add_new_server': 'New Server',
       'no_server_selected': 'No Server Selected',
-      'select_server_to_start':
-          'Select a server from the list to start browsing',
+      'select_server_to_start': 'Select a server from the list to start browsing',
       'settings': 'Settings',
 
       // Server list
@@ -295,6 +293,8 @@ class LanguageManager extends ChangeNotifier {
       'upload': 'Upload',
       'download': 'Download',
       'copy_url': 'Copy URL',
+      'copy': 'Copy',
+      'preview': 'Preview',
       'rename': 'Rename',
       'delete_file': 'Delete File',
       'delete_folder': 'Delete Folder',
@@ -335,8 +335,7 @@ class LanguageManager extends ChangeNotifier {
 
       // Confirm dialogs
       'confirm_delete': 'Confirm Delete',
-      'confirm_delete_folder':
-          'Are you sure you want to delete folder "%s" and all its contents?',
+      'confirm_delete_folder': 'Are you sure you want to delete folder "%s" and all its contents?',
       'confirm_delete_file': 'Are you sure you want to delete file "%s"?',
       'cancel_btn': 'Cancel',
       'confirm_btn': 'Confirm',
@@ -355,8 +354,7 @@ class LanguageManager extends ChangeNotifier {
       'delete_object_title': 'Delete Object',
       'delete_object_confirm': 'Are you sure you want to delete "%s"?',
       'delete_folder_title': 'Delete Folder',
-      'delete_folder_warning':
-          'Warning: This will delete all files and subfolders inside!',
+      'delete_folder_warning': 'Warning: This will delete all files and subfolders inside!',
       'delete_folder_success': 'Deleted folder "%s" and %s object(s)',
       'rename_success': 'Renamed %s to %s',
       'rename_error': 'Error renaming %s: %s',
@@ -370,8 +368,7 @@ class LanguageManager extends ChangeNotifier {
       'retry': 'Retry',
       'copy_link': 'Copy Link',
       'delete_server_title': 'Delete Server',
-      'delete_server_message':
-          'Are you sure you want to delete server "{name}"?',
+      'delete_server_message': 'Are you sure you want to delete server "{name}"?',
       'download_queue': 'Download Queue',
       'downloading_count': 'Downloading %s files...',
       'download_complete': 'Download Complete',
@@ -392,8 +389,7 @@ class LanguageManager extends ChangeNotifier {
       'list_buckets_success': '✓ List buckets succeeded',
       'found_buckets': 'Found %s bucket(s)',
       'list_buckets_failed': '✗ List buckets failed: %s',
-      'r2_list_buckets_note':
-          '  This is normal for R2 - it doesn\'t support list_buckets operation',
+      'r2_list_buckets_note': '  This is normal for R2 - it doesn\'t support list_buckets operation',
       'test_list_objects': '=== Testing List Objects ===',
       'list_objects_success': '✓ List objects succeeded',
       'found_objects': 'Found %s result(s)',
@@ -421,8 +417,7 @@ class LanguageManager extends ChangeNotifier {
       'batch_delete_result_success': 'Deleted %s files',
 
       // R2 Connection Helper
-      'r2_validation_endpoint':
-          'Endpoint does not appear to be a Cloudflare R2 URL',
+      'r2_validation_endpoint': 'Endpoint does not appear to be a Cloudflare R2 URL',
       'r2_validation_ak': 'Access Key ID is required',
       'r2_validation_sk': 'Secret Access Key is required',
       'r2_validation_bucket': 'Bucket name is required',
