@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -75,6 +76,7 @@ class _AppShellState extends State<AppShell> {
   bool _isSidebarExtended = true;
   double _sidebarWidth = 220.0;
   bool _isHoveringResizeHandle = false;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -185,8 +187,11 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isMobilePlatform = const [TargetPlatform.iOS, TargetPlatform.android].contains(defaultTargetPlatform);
+        final useDrawer = isMobilePlatform;
+
         // Auto-collapse if width is small
-        if (constraints.maxWidth < 600 && _isSidebarExtended) {
+        if (!useDrawer && constraints.maxWidth < 600 && _isSidebarExtended) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() {
@@ -197,510 +202,437 @@ class _AppShellState extends State<AppShell> {
         }
 
         return Scaffold(
+          key: _scaffoldKey,
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          drawer: useDrawer
+              ? Drawer(
+                  width: math.min(constraints.maxWidth * 0.85, 320),
+                  child: SafeArea(
+                    child: _buildSidebar(
+                      context,
+                      isSidebarExtended: true,
+                      sidebarWidth: math.min(constraints.maxWidth * 0.85, 320),
+                      isDrawer: true,
+                      onDrawerClose: () => _scaffoldKey.currentState?.closeDrawer(),
+                    ),
+                  ),
+                )
+              : null,
           body: Column(
             children: [
               // Custom Title Bar
               const WindowTitleBar(),
               Expanded(
-                child: Row(
-                  children: [
-                    // 左侧导航栏 - Floating Sidebar
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: _isSidebarExtended ? _sidebarWidth : 80,
-                      margin: const EdgeInsets.fromLTRB(8, 0, 0, 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
+                child: useDrawer
+                    ? _buildContentArea(
+                        context,
+                        margin: const EdgeInsets.all(0),
+                        onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+                      )
+                    : Row(
+                        children: [
+                          _buildSidebar(context, isSidebarExtended: _isSidebarExtended, sidebarWidth: _sidebarWidth),
+
+                          // Resize Handle
+                          if (!useDrawer)
+                            MouseRegion(
+                              cursor: SystemMouseCursors.resizeColumn,
+                              onEnter: (_) => setState(() => _isHoveringResizeHandle = true),
+                              onExit: (_) => setState(() => _isHoveringResizeHandle = false),
+                              child: GestureDetector(
+                                onHorizontalDragUpdate: (details) {
+                                  setState(() {
+                                    // Only resize if extended
+                                    if (!_isSidebarExtended) {
+                                      if (details.delta.dx > 5) {
+                                        _isSidebarExtended = true;
+                                      }
+                                      return;
+                                    }
+
+                                    _sidebarWidth += details.delta.dx;
+                                    if (_sidebarWidth < 200) _sidebarWidth = 200;
+                                    if (_sidebarWidth > 400) _sidebarWidth = 400;
+                                  });
+                                },
+                                child: Container(
+                                  width: 8,
+                                  height: double.infinity,
+                                  color: Colors.transparent,
+                                  child: Center(
+                                    child: Container(
+                                      width: 2,
+                                      color: _isHoveringResizeHandle
+                                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          Expanded(child: _buildContentArea(context, margin: const EdgeInsets.fromLTRB(0, 0, 8, 8))),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: NavigationRail(
-                          extended: _isSidebarExtended,
-                          minExtendedWidth: _sidebarWidth,
-                          backgroundColor: Colors.transparent,
-                          leading: Column(
-                            children: [
-                              if (_isSidebarExtended)
-                                SizedBox(
-                                  height: 60,
-                                  width: _sidebarWidth,
-                                  child: Stack(
-                                    children: [
-                                      // Logo - Vertically aligned
-                                      Positioned(
-                                        top: 12,
-                                        left: 12,
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    Theme.of(context).colorScheme.primary,
-                                                    Theme.of(context).colorScheme.secondary,
-                                                  ],
-                                                ),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(Icons.cloud_outlined, size: 20, color: Colors.white),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  context.loc('app_name_s3'),
-                                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Theme.of(context).colorScheme.primary,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  context.loc('app_name_manager'),
-                                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                    fontSize: AppFontSizes.xs,
-                                                    letterSpacing: 2,
-                                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Collapse Button - Absolute Top Right
-                                      Positioned(
-                                        top: 15,
-                                        right: 4,
-                                        child: IconButton(
-                                          visualDensity: VisualDensity.compact,
-                                          icon: Icon(
-                                            Icons.menu_open_rounded,
-                                            color: Theme.of(context).colorScheme.onSurface,
-                                            size: 20,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _isSidebarExtended = false;
-                                            });
-                                          },
-                                          tooltip: context.loc('collapse'),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                // Collapsed: Toggle acts as logo
-                                Container(
-                                  height: 60,
-                                  alignment: Alignment.center,
-                                  child: Tooltip(
-                                    message: context.loc('expand'),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Theme.of(context).colorScheme.primary,
-                                            Theme.of(context).colorScheme.secondary,
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          borderRadius: BorderRadius.circular(8),
-                                          onTap: () {
-                                            setState(() {
-                                              _isSidebarExtended = true;
-                                            });
-                                          },
-                                          child: const Padding(
-                                            padding: EdgeInsets.all(8),
-                                            child: Icon(Icons.cloud_outlined, size: 24, color: Colors.white),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(height: 12),
-                              // Add Server Button
-                              if (_isSidebarExtended)
-                                SizedBox(
-                                  width: _sidebarWidth - 32,
-                                  child: AppComponents.primaryButton(
-                                    text: context.loc('add_new_server'),
-                                    icon: Icons.add,
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        PageRouteBuilder(
-                                          pageBuilder: (context, animation, secondaryAnimation) =>
-                                              S3ConfigPage(onSave: _loadConfigs),
-                                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                            const curve = Curves.easeOutQuart;
-
-                                            var scaleAnimation = Tween(
-                                              begin: 0.0,
-                                              end: 1.0,
-                                            ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                            var fadeAnimation = Tween(
-                                              begin: 0.0,
-                                              end: 1.0,
-                                            ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                            return ScaleTransition(
-                                              scale: scaleAnimation,
-                                              alignment: Alignment.topLeft,
-                                              child: FadeTransition(opacity: fadeAnimation, child: child),
-                                            );
-                                          },
-                                          transitionDuration: const Duration(milliseconds: 400),
-                                          reverseTransitionDuration: const Duration(milliseconds: 300),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                )
-                              else
-                                Center(
-                                  child: Tooltip(
-                                    message: context.loc('add_new_server'),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          borderRadius: BorderRadius.circular(8),
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              PageRouteBuilder(
-                                                pageBuilder: (context, animation, secondaryAnimation) =>
-                                                    S3ConfigPage(onSave: _loadConfigs),
-                                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                                  const curve = Curves.easeOutQuart;
-
-                                                  var scaleAnimation = Tween(
-                                                    begin: 0.0,
-                                                    end: 1.0,
-                                                  ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                                  var fadeAnimation = Tween(
-                                                    begin: 0.0,
-                                                    end: 1.0,
-                                                  ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                                  return ScaleTransition(
-                                                    scale: scaleAnimation,
-                                                    alignment: Alignment.topLeft,
-                                                    child: FadeTransition(opacity: fadeAnimation, child: child),
-                                                  );
-                                                },
-                                                transitionDuration: const Duration(milliseconds: 400),
-                                                reverseTransitionDuration: const Duration(milliseconds: 300),
-                                              ),
-                                            );
-                                          },
-                                          child: const Padding(
-                                            padding: EdgeInsets.all(8),
-                                            child: Icon(Icons.add, color: Colors.white, size: 20),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          indicatorColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          destinations: [
-                            ..._serverConfigs.map((server) {
-                              final isSelected = _selectedServerConfig?.id == server.id;
-                              return NavigationRailDestination(
-                                icon: Icon(
-                                  Icons.cloud_outlined,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                ),
-                                selectedIcon: Icon(
-                                  Icons.cloud_done,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                label: GestureDetector(
-                                  onSecondaryTapDown: (details) {
-                                    _showServerContextMenu(context, details.globalPosition, server);
-                                  },
-                                  onLongPressStart: (details) {
-                                    _showServerContextMenu(context, details.globalPosition, server);
-                                  },
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: _sidebarWidth - 80, // Prevent overflow
-                                    ),
-                                    child: Text(
-                                      server.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: AppFontSizes.md - 1,
-                                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                        color: isSelected
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Theme.of(context).colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                              );
-                            }),
-                          ],
-                          trailing: Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                // Settings Button
-                                Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          PageRouteBuilder(
-                                            pageBuilder: (context, animation, secondaryAnimation) =>
-                                                const SettingsPage(),
-                                            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                              const begin = 0.0;
-                                              const end = 1.0;
-                                              const curve = Curves.easeOutQuart;
-
-                                              var scaleAnimation = Tween(
-                                                begin: begin,
-                                                end: end,
-                                              ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                              var fadeAnimation = Tween(
-                                                begin: 0.0,
-                                                end: 1.0,
-                                              ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                              return ScaleTransition(
-                                                scale: scaleAnimation,
-                                                alignment: Alignment.bottomLeft,
-                                                child: FadeTransition(opacity: fadeAnimation, child: child),
-                                              );
-                                            },
-                                            transitionDuration: const Duration(milliseconds: 400),
-                                            reverseTransitionDuration: const Duration(milliseconds: 300),
-                                          ),
-                                        );
-                                      },
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: _isSidebarExtended
-                                            ? Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.settings_outlined,
-                                                    color: Theme.of(context).colorScheme.primary,
-                                                    size: 20,
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Flexible(
-                                                    child: Text(
-                                                      context.loc('settings'),
-                                                      overflow: TextOverflow.ellipsis,
-                                                      maxLines: 1,
-                                                      style: TextStyle(
-                                                        color: Theme.of(context).colorScheme.primary,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              )
-                                            : Icon(
-                                                Icons.settings_outlined,
-                                                color: Theme.of(context).colorScheme.primary,
-                                                size: 24,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          onDestinationSelected: (index) {
-                            setState(() {
-                              _selectedServerConfig = _serverConfigs[index];
-                            });
-                          },
-                          selectedIndex: _selectedServerConfig != null && _serverConfigs.isNotEmpty
-                              ? _serverConfigs.indexWhere((s) => s.id == _selectedServerConfig!.id)
-                              : null,
-                        ),
-                      ),
-                    ),
-
-                    // Resize Handle
-                    MouseRegion(
-                      cursor: SystemMouseCursors.resizeColumn,
-                      onEnter: (_) => setState(() => _isHoveringResizeHandle = true),
-                      onExit: (_) => setState(() => _isHoveringResizeHandle = false),
-                      child: GestureDetector(
-                        onHorizontalDragUpdate: (details) {
-                          setState(() {
-                            // Only resize if extended
-                            if (!_isSidebarExtended) {
-                              if (details.delta.dx > 5) {
-                                _isSidebarExtended = true;
-                              }
-                              return;
-                            }
-
-                            _sidebarWidth += details.delta.dx;
-                            if (_sidebarWidth < 200) _sidebarWidth = 200;
-                            if (_sidebarWidth > 400) _sidebarWidth = 400;
-                          });
-                        },
-                        child: Container(
-                          width: 8,
-                          height: double.infinity,
-                          color: Colors.transparent,
-                          child: Center(
-                            child: Container(
-                              width: 2,
-                              color: _isHoveringResizeHandle
-                                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
-                                  : Colors.transparent,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Right Content Area - Floating
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.fromLTRB(0, 0, 8, 8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _selectedServerConfig != null
-                              ? S3BrowserPage(
-                                  serverConfig: _selectedServerConfig!,
-                                  onEditServer: () {
-                                    Navigator.push(
-                                      context,
-                                      PageRouteBuilder(
-                                        pageBuilder: (context, animation, secondaryAnimation) =>
-                                            S3ConfigPage(existingConfig: _selectedServerConfig!, onSave: _loadConfigs),
-                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                          const curve = Curves.easeOutQuart;
-
-                                          var scaleAnimation = Tween(
-                                            begin: 0.0,
-                                            end: 1.0,
-                                          ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                          var fadeAnimation = Tween(
-                                            begin: 0.0,
-                                            end: 1.0,
-                                          ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                          return ScaleTransition(
-                                            scale: scaleAnimation,
-                                            alignment: Alignment.topRight,
-                                            child: FadeTransition(opacity: fadeAnimation, child: child),
-                                          );
-                                        },
-                                        transitionDuration: const Duration(milliseconds: 400),
-                                        reverseTransitionDuration: const Duration(milliseconds: 300),
-                                      ),
-                                    );
-                                  },
-                                )
-                              : AppComponents.emptyState(
-                                  icon: Icons.cloud_off_outlined,
-                                  title: context.loc('no_server_selected'),
-                                  subtitle: context.loc('select_server_to_start'),
-                                  onAction: _serverConfigs.isEmpty
-                                      ? () {
-                                          Navigator.push(
-                                            context,
-                                            PageRouteBuilder(
-                                              pageBuilder: (context, animation, secondaryAnimation) =>
-                                                  S3ConfigPage(onSave: _loadConfigs),
-                                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                                const curve = Curves.easeOutQuart;
-
-                                                var scaleAnimation = Tween(
-                                                  begin: 0.0,
-                                                  end: 1.0,
-                                                ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                                var fadeAnimation = Tween(
-                                                  begin: 0.0,
-                                                  end: 1.0,
-                                                ).animate(CurvedAnimation(parent: animation, curve: curve));
-
-                                                return ScaleTransition(
-                                                  scale: scaleAnimation,
-                                                  alignment: Alignment.topLeft,
-                                                  child: FadeTransition(opacity: fadeAnimation, child: child),
-                                                );
-                                              },
-                                              transitionDuration: const Duration(milliseconds: 400),
-                                              reverseTransitionDuration: const Duration(milliseconds: 300),
-                                            ),
-                                          );
-                                        }
-                                      : null,
-                                  actionText: _serverConfigs.isEmpty ? context.loc('add_new_server') : null,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSidebar(
+    BuildContext context, {
+    required bool isSidebarExtended,
+    required double sidebarWidth,
+    bool isDrawer = false,
+    VoidCallback? onDrawerClose,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: isSidebarExtended ? sidebarWidth : 80,
+      margin: isDrawer ? EdgeInsets.zero : const EdgeInsets.fromLTRB(8, 0, 0, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: NavigationRail(
+          extended: isSidebarExtended,
+          minExtendedWidth: sidebarWidth,
+          backgroundColor: Colors.transparent,
+          leading: Column(
+            children: [
+              if (isSidebarExtended)
+                SizedBox(
+                  height: 60,
+                  width: sidebarWidth,
+                  child: Stack(
+                    children: [
+                      // Logo - Vertically aligned
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Theme.of(context).colorScheme.primary,
+                                    Theme.of(context).colorScheme.secondary,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.cloud_outlined, size: 20, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.loc('app_name_s3'),
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                                Text(
+                                  context.loc('app_name_manager'),
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    fontSize: AppFontSizes.xs,
+                                    letterSpacing: 2,
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Collapse Button - Absolute Top Right
+                      if (!isDrawer)
+                        Positioned(
+                          top: 15,
+                          right: 4,
+                          child: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Icons.menu_open_rounded,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isSidebarExtended = false;
+                              });
+                            },
+                            tooltip: context.loc('collapse'),
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              else
+                // Collapsed: Toggle acts as logo
+                Container(
+                  height: 60,
+                  alignment: Alignment.center,
+                  child: Tooltip(
+                    message: context.loc('expand'),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.secondary],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            setState(() {
+                              _isSidebarExtended = true;
+                            });
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.cloud_outlined, size: 24, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              // Add Server Button
+              if (isSidebarExtended)
+                SizedBox(
+                  width: sidebarWidth - 32,
+                  child: AppComponents.primaryButton(
+                    text: context.loc('add_new_server'),
+                    icon: Icons.add,
+                    onPressed: () {
+                      onDrawerClose?.call();
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => S3ConfigPage(onSave: _loadConfigs),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              else
+                Center(
+                  child: Tooltip(
+                    message: context.loc('add_new_server'),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            onDrawerClose?.call();
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (context, animation, secondaryAnimation) =>
+                                    S3ConfigPage(onSave: _loadConfigs),
+                              ),
+                            );
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.add, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          indicatorColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+          indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          destinations: [
+            ..._serverConfigs.map((server) {
+              final isSelected = _selectedServerConfig?.id == server.id;
+              return NavigationRailDestination(
+                icon: Icon(
+                  Icons.cloud_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+                selectedIcon: Icon(Icons.cloud_done, size: 20, color: Theme.of(context).colorScheme.primary),
+                label: GestureDetector(
+                  onSecondaryTapDown: (details) {
+                    _showServerContextMenu(context, details.globalPosition, server);
+                  },
+                  onLongPressStart: (details) {
+                    _showServerContextMenu(context, details.globalPosition, server);
+                  },
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: sidebarWidth - 80, // Prevent overflow
+                    ),
+                    child: Text(
+                      server.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSizes.md - 1,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+              );
+            }),
+          ],
+          trailing: Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Settings Button
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        onDrawerClose?.call();
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: isSidebarExtended
+                            ? Row(
+                                children: [
+                                  Icon(Icons.settings_outlined, color: Theme.of(context).colorScheme.primary, size: 20),
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      context.loc('settings'),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Icon(Icons.settings_outlined, color: Theme.of(context).colorScheme.primary, size: 24),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          onDestinationSelected: (index) {
+            setState(() {
+              _selectedServerConfig = _serverConfigs[index];
+            });
+            onDrawerClose?.call();
+          },
+          selectedIndex: _selectedServerConfig != null && _serverConfigs.isNotEmpty
+              ? _serverConfigs.indexWhere((s) => s.id == _selectedServerConfig!.id)
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentArea(BuildContext context, {required EdgeInsets margin, VoidCallback? onOpenDrawer}) {
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _selectedServerConfig != null
+            ? S3BrowserPage(
+                serverConfig: _selectedServerConfig!,
+                onEditServer: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          S3ConfigPage(existingConfig: _selectedServerConfig!, onSave: _loadConfigs),
+                    ),
+                  );
+                },
+                onOpenDrawer: onOpenDrawer,
+              )
+            : Scaffold(
+                appBar: onOpenDrawer != null
+                    ? AppBar(
+                        title: Text(context.loc("s3_manager")),
+                        centerTitle: true,
+                        leading: IconButton(icon: const Icon(Icons.menu), onPressed: onOpenDrawer),
+                        elevation: 0,
+                        scrolledUnderElevation: 0,
+                        actions: [
+                          IconButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) =>
+                                      S3ConfigPage(onSave: _loadConfigs),
+                                ),
+                              );
+                            },
+                            icon: Icon(Icons.add),
+                          ),
+                        ],
+                      )
+                    : null,
+                body: AppComponents.emptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: context.loc('no_server_selected'),
+                  subtitle: context.loc('select_server_to_start'),
+                  onAction: _serverConfigs.isEmpty
+                      ? () {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder: (context, animation, secondaryAnimation) =>
+                                  S3ConfigPage(onSave: _loadConfigs),
+                            ),
+                          );
+                        }
+                      : null,
+                  actionText: _serverConfigs.isEmpty ? context.loc('add_new_server') : null,
+                ),
+              ),
+      ),
     );
   }
 }

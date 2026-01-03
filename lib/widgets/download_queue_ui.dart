@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ploys3/core/localization.dart';
 import 'package:ploys3/download_manager.dart';
@@ -24,6 +25,15 @@ class _DownloadQueueUIState extends State<DownloadQueueUI> {
       builder: (context, child) {
         final queue = widget.downloadManager.queue;
         if (queue.isEmpty) return const SizedBox.shrink();
+        final mediaQuery = MediaQuery.of(context);
+        final isMobilePlatform =
+            const [TargetPlatform.iOS, TargetPlatform.android].contains(defaultTargetPlatform);
+        final horizontalMargin = isMobilePlatform ? 12.0 : 20.0;
+        final bottomMargin = isMobilePlatform ? 12.0 : 20.0;
+        final collapsedHeight = isMobilePlatform ? 56.0 : 60.0;
+        final expandedHeight =
+            isMobilePlatform ? mediaQuery.size.height * 0.6 : 500.0;
+        final stackedOffset = collapsedHeight + (isMobilePlatform ? 12.0 : 20.0);
 
         final activeCount = queue
             .where(
@@ -37,8 +47,9 @@ class _DownloadQueueUIState extends State<DownloadQueueUI> {
         // We'll mimic upload queue logic.
 
         return Positioned(
-          right: 20,
-          bottom: 20 + 60 + 20, // Stack above upload queue if both exist?
+          left: isMobilePlatform ? horizontalMargin : null,
+          right: horizontalMargin,
+          bottom: bottomMargin + mediaQuery.padding.bottom + stackedOffset,
           // To avoid overlap, we might need a better layout strategy or just offset.
           // Since users usually do one or the other, or we can just stack.
           // Or let's put it on top of upload queue?
@@ -51,8 +62,8 @@ class _DownloadQueueUIState extends State<DownloadQueueUI> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            width: _isExpanded ? 400 : 200,
-            height: _isExpanded ? 500 : 60,
+            width: isMobilePlatform ? double.infinity : (_isExpanded ? 400 : 200),
+            height: _isExpanded ? expandedHeight : collapsedHeight,
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),

@@ -25,15 +25,13 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
   final TextEditingController _bucketController = TextEditingController();
   final TextEditingController _accessKeyIdController = TextEditingController();
   final TextEditingController _cdnUrlController = TextEditingController();
-  final TextEditingController _secretAccessKeyController =
-      TextEditingController();
+  final TextEditingController _secretAccessKeyController = TextEditingController();
   final TextEditingController _regionController = TextEditingController();
 
   Future<void> _saveConfig() async {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
-      final List<String> serverConfigs =
-          prefs.getStringList('server_configs') ?? [];
+      final List<String> serverConfigs = prefs.getStringList('server_configs') ?? [];
 
       if (widget.existingConfig != null) {
         // Editing existing config - preserve the ID
@@ -44,12 +42,8 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
           bucket: _bucketController.text,
           accessKeyId: _accessKeyIdController.text,
           secretAccessKey: _secretAccessKeyController.text,
-          region: _regionController.text.isNotEmpty
-              ? _regionController.text
-              : null,
-          cdnUrl: _cdnUrlController.text.isNotEmpty
-              ? _cdnUrlController.text
-              : null,
+          region: _regionController.text.isNotEmpty ? _regionController.text : null,
+          cdnUrl: _cdnUrlController.text.isNotEmpty ? _cdnUrlController.text : null,
         );
 
         // Find and replace the existing config
@@ -70,12 +64,8 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
           bucket: _bucketController.text,
           accessKeyId: _accessKeyIdController.text,
           secretAccessKey: _secretAccessKeyController.text,
-          region: _regionController.text.isNotEmpty
-              ? _regionController.text
-              : null,
-          cdnUrl: _cdnUrlController.text.isNotEmpty
-              ? _cdnUrlController.text
-              : null,
+          region: _regionController.text.isNotEmpty ? _regionController.text : null,
+          cdnUrl: _cdnUrlController.text.isNotEmpty ? _cdnUrlController.text : null,
         );
 
         serverConfigs.add(json.encode(newConfig.toJson()));
@@ -84,12 +74,9 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
       await prefs.setStringList('server_configs', serverConfigs);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.loc('server_saved')),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.loc('server_saved')), behavior: SnackBarBehavior.floating));
         widget.onSave();
         Navigator.pop(context);
       }
@@ -140,12 +127,11 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
               child: Scaffold(
                 appBar: AppBar(
                   title: Text(
-                    widget.existingConfig != null
-                        ? context.loc('title_edit_server')
-                        : context.loc('title_add_server'),
+                    widget.existingConfig != null ? context.loc('title_edit_server') : context.loc('title_add_server'),
                   ),
                   elevation: 0,
                   scrolledUnderElevation: 0,
+                  centerTitle: true,
                 ),
                 backgroundColor: Colors.transparent,
                 body: Padding(
@@ -161,11 +147,7 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
                             Expanded(
                               child: ListView(
                                 children: <Widget>[
-                                  _buildTextFormField(
-                                    context.loc('name'),
-                                    _nameController,
-                                    context.loc('name_hint'),
-                                  ),
+                                  _buildTextFormField(context.loc('name'), _nameController, context.loc('name_hint')),
                                   _buildTextFormField(
                                     context.loc('address'),
                                     _addressController,
@@ -215,10 +197,7 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
                                 ElevatedButton(
                                   onPressed: _saveConfig,
                                   style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 12,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                                   ),
                                   child: Text(context.loc('save')),
                                 ),
@@ -255,18 +234,12 @@ class _S3ConfigPageState extends State<S3ConfigPage> {
           labelText: label,
           hintText: hintText,
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           labelStyle: const TextStyle(fontSize: AppFontSizes.md),
           hintStyle: const TextStyle(fontSize: AppFontSizes.md),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(
-              color: Theme.of(context).indicatorColor,
-              width: 2,
-            ),
+            borderSide: BorderSide(color: Theme.of(context).indicatorColor, width: 2),
             borderRadius: BorderRadius.circular(8),
           ),
           filled: true,
